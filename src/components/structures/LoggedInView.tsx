@@ -22,26 +22,27 @@ import { MatrixClient } from 'matrix-js-sdk/src/client';
 import { MatrixEvent } from 'matrix-js-sdk/src/models/event';
 import { DragDropContext } from 'react-beautiful-dnd';
 
-import {Key, isOnlyCtrlOrCmdKeyEvent, isOnlyCtrlOrCmdIgnoreShiftKeyEvent} from '../../Keyboard';
+import { Key, isOnlyCtrlOrCmdKeyEvent, isOnlyCtrlOrCmdIgnoreShiftKeyEvent } from '../../Keyboard';
 import PageTypes from '../../PageTypes';
 import CallMediaHandler from '../../CallMediaHandler';
 import { fixupColorFonts } from '../../utils/FontManager';
 import * as sdk from '../../index';
 import dis from '../../dispatcher';
 import sessionStore from '../../stores/SessionStore';
-import {MatrixClientPeg, MatrixClientCreds} from '../../MatrixClientPeg';
+import { MatrixClientPeg, MatrixClientCreds } from '../../MatrixClientPeg';
 import SettingsStore from "../../settings/SettingsStore";
 import RoomListStore from "../../stores/RoomListStore";
 
 import TagOrderActions from '../../actions/TagOrderActions';
 import RoomListActions from '../../actions/RoomListActions';
 import ResizeHandle from '../views/elements/ResizeHandle';
-import {Resizer, CollapseDistributor} from '../../resizer';
+import { Resizer, CollapseDistributor } from '../../resizer';
 import MatrixClientContext from "../../contexts/MatrixClientContext";
 import * as KeyboardShortcuts from "../../accessibility/KeyboardShortcuts";
 import HomePage from "./HomePage";
 import ResizeNotifier from "../../utils/ResizeNotifier";
 import PlatformPeg from "../../PlatformPeg";
+import LoggedInviewWrapper from "./LoggedInviewWrapper";
 // We need to fetch each pinned message individually (if we don't already have it)
 // so each pinned message may trigger a request. Limit the number per room for sanity.
 // NB. this is just for server notices rather than pinned messages in general.
@@ -234,10 +235,10 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
             toggleSize: 260 - 50,
             onCollapsed: (collapsed) => {
                 if (collapsed) {
-                    dis.dispatch({action: "hide_left_panel"}, true);
+                    dis.dispatch({ action: "hide_left_panel" }, true);
                     window.localStorage.setItem("mx_lhs_size", '0');
                 } else {
-                    dis.dispatch({action: "show_left_panel"}, true);
+                    dis.dispatch({ action: "show_left_panel" }, true);
                 }
             },
             onResized: (size) => {
@@ -268,7 +269,7 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
             });
         }
         if (event.getType() === "m.ignored_user_list") {
-            dis.dispatch({action: "ignore_state_changed"});
+            dis.dispatch({ action: "ignore_state_changed" });
         }
     };
 
@@ -337,7 +338,7 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
             // refocusing during a paste event will make the
             // paste end up in the newly focused element,
             // so dispatch synchronously before paste happens
-            dis.dispatch({action: 'focus_composer'}, true);
+            dis.dispatch({ action: 'focus_composer' }, true);
         }
     };
 
@@ -379,19 +380,19 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
     };
 
     _onKeyDown = (ev) => {
-            /*
-            // Remove this for now as ctrl+alt = alt-gr so this breaks keyboards which rely on alt-gr for numbers
-            // Will need to find a better meta key if anyone actually cares about using this.
-            if (ev.altKey && ev.ctrlKey && ev.keyCode > 48 && ev.keyCode < 58) {
-                dis.dispatch({
-                    action: 'view_indexed_room',
-                    roomIndex: ev.keyCode - 49,
-                });
-                ev.stopPropagation();
-                ev.preventDefault();
-                return;
-            }
-            */
+        /*
+        // Remove this for now as ctrl+alt = alt-gr so this breaks keyboards which rely on alt-gr for numbers
+        // Will need to find a better meta key if anyone actually cares about using this.
+        if (ev.altKey && ev.ctrlKey && ev.keyCode > 48 && ev.keyCode < 58) {
+            dis.dispatch({
+                action: 'view_indexed_room',
+                roomIndex: ev.keyCode - 49,
+            });
+            ev.stopPropagation();
+            ev.preventDefault();
+            return;
+        }
+        */
 
         let handled = false;
         const ctrlCmdOnly = isOnlyCtrlOrCmdKeyEvent(ev);
@@ -487,7 +488,7 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
 
             if (!isClickShortcut && ev.key !== Key.TAB && !canElementReceiveInput(ev.target)) {
                 // synchronous dispatch so we focus before key generates input
-                dis.dispatch({action: 'focus_composer'}, true);
+                dis.dispatch({ action: 'focus_composer' }, true);
                 ev.stopPropagation();
                 // we should *not* preventDefault() here as
                 // that would prevent typing in the now-focussed composer
@@ -588,7 +589,7 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
 
         // Always clear the mouseDown state to ensure we don't accidentally
         // use stale values due to the mouseDown checks.
-        this.setState({mouseDown: null});
+        this.setState({ mouseDown: null });
     };
 
     render() {
@@ -610,18 +611,18 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
         switch (this.props.page_type) {
             case PageTypes.RoomView:
                 pageElement = <RoomView
-                        ref={this._roomView}
-                        autoJoin={this.props.autoJoin}
-                        onRegistered={this.props.onRegistered}
-                        thirdPartyInvite={this.props.thirdPartyInvite}
-                        oobData={this.props.roomOobData}
-                        viaServers={this.props.viaServers}
-                        eventPixelOffset={this.props.initialEventPixelOffset}
-                        key={this.props.currentRoomId || 'roomview'}
-                        disabled={this.props.middleDisabled}
-                        ConferenceHandler={this.props.ConferenceHandler}
-                        resizeNotifier={this.props.resizeNotifier}
-                    />;
+                    ref={this._roomView}
+                    autoJoin={this.props.autoJoin}
+                    onRegistered={this.props.onRegistered}
+                    thirdPartyInvite={this.props.thirdPartyInvite}
+                    oobData={this.props.roomOobData}
+                    viaServers={this.props.viaServers}
+                    eventPixelOffset={this.props.initialEventPixelOffset}
+                    key={this.props.currentRoomId || 'roomview'}
+                    disabled={this.props.middleDisabled}
+                    ConferenceHandler={this.props.ConferenceHandler}
+                    resizeNotifier={this.props.resizeNotifier}
+                />;
                 break;
 
             case PageTypes.MyGroups:
@@ -673,7 +674,7 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
             topBar = <CookieBar policyUrl={policyUrl} />;
         } else if (this.props.hasNewVersion) {
             topBar = <NewVersionBar version={this.props.version} newVersion={this.props.newVersion}
-                                    releaseNotes={this.props.newVersionReleaseNotes}
+                releaseNotes={this.props.newVersionReleaseNotes}
             />;
         } else if (this.props.checkingForUpdate) {
             topBar = <UpdateCheckBar {...this.props.checkingForUpdate} />;
@@ -691,7 +692,7 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
             bodyClasses += ' mx_MatrixChat_useCompactLayout';
         }
 
-        return (
+        return (<LoggedInviewWrapper>
             <MatrixClientContext.Provider value={this._matrixClient}>
                 <div
                     onPaste={this._onPaste}
@@ -701,7 +702,7 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
                     onMouseDown={this._onMouseDown}
                     onMouseUp={this._onMouseUp}
                 >
-                    { topBar }
+                    {topBar}
                     <ToastContainer />
                     <DragDropContext onDragEnd={this._onDragEnd}>
                         <div ref={this._resizeContainer} className={bodyClasses}>
@@ -711,11 +712,12 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
                                 disabled={this.props.leftDisabled}
                             />
                             <ResizeHandle />
-                            { pageElement }
+                            {pageElement}
                         </div>
                     </DragDropContext>
                 </div>
             </MatrixClientContext.Provider>
+        </LoggedInviewWrapper>
         );
     }
 }
