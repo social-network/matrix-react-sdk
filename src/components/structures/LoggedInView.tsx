@@ -42,7 +42,7 @@ import * as KeyboardShortcuts from "../../accessibility/KeyboardShortcuts";
 import HomePage from "./HomePage";
 import ResizeNotifier from "../../utils/ResizeNotifier";
 import PlatformPeg from "../../PlatformPeg";
-import LoggedInviewWrapper from "./LoggedInviewWrapper";
+import LoggedInViewWrapper from "./LoggedInViewWrapper";
 // We need to fetch each pinned message individually (if we don't already have it)
 // so each pinned message may trigger a request. Limit the number per room for sanity.
 // NB. this is just for server notices rather than pinned messages in general.
@@ -692,7 +692,7 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
             bodyClasses += ' mx_MatrixChat_useCompactLayout';
         }
 
-        return (<LoggedInviewWrapper>
+        return (<LoggedInViewWrapper>
             <MatrixClientContext.Provider value={this._matrixClient}>
                 <div
                     onPaste={this._onPaste}
@@ -717,7 +717,7 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
                     </DragDropContext>
                 </div>
             </MatrixClientContext.Provider>
-        </LoggedInviewWrapper>
+        </LoggedInViewWrapper>
         );
     }
 }
