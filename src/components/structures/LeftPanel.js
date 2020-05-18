@@ -24,9 +24,9 @@ import * as sdk from '../../index';
 import dis from '../../dispatcher';
 import * as VectorConferenceHandler from '../../VectorConferenceHandler';
 import SettingsStore from '../../settings/SettingsStore';
-import {_t} from "../../languageHandler";
+import { _t } from "../../languageHandler";
 import Analytics from "../../Analytics";
-
+import LeftPanelWrapper from './LeftPanelWrapper';
 
 const LeftPanel = createReactClass({
     displayName: 'LeftPanel',
@@ -37,7 +37,7 @@ const LeftPanel = createReactClass({
         collapsed: PropTypes.bool.isRequired,
     },
 
-    getInitialState: function() {
+    getInitialState: function () {
         return {
             searchFilter: '',
             breadcrumbs: false,
@@ -45,7 +45,7 @@ const LeftPanel = createReactClass({
     },
 
     // TODO: [REACT-WARNING] Move this to constructor
-    UNSAFE_componentWillMount: function() {
+    UNSAFE_componentWillMount: function () {
         this.focusedElement = null;
 
         this._breadcrumbsWatcherRef = SettingsStore.watchSetting(
@@ -55,15 +55,15 @@ const LeftPanel = createReactClass({
 
         const useBreadcrumbs = !!SettingsStore.getValue("breadcrumbs");
         Analytics.setBreadcrumbs(useBreadcrumbs);
-        this.setState({breadcrumbs: useBreadcrumbs});
+        this.setState({ breadcrumbs: useBreadcrumbs });
     },
 
-    componentWillUnmount: function() {
+    componentWillUnmount: function () {
         SettingsStore.unwatchSetting(this._breadcrumbsWatcherRef);
         SettingsStore.unwatchSetting(this._tagPanelWatcherRef);
     },
 
-    shouldComponentUpdate: function(nextProps, nextState) {
+    shouldComponentUpdate: function (nextProps, nextState) {
         // MatrixChat will update whenever the user switches
         // rooms, but propagating this change all the way down
         // the react tree is quite slow, so we cut this off
@@ -93,25 +93,25 @@ const LeftPanel = createReactClass({
         }
     },
 
-    _onBreadcrumbsChanged: function(settingName, roomId, level, valueAtLevel, value) {
+    _onBreadcrumbsChanged: function (settingName, roomId, level, valueAtLevel, value) {
         // Features are only possible at a single level, so we can get away with using valueAtLevel.
         // The SettingsStore runs on the same tick as the update, so `value` will be wrong.
-        this.setState({breadcrumbs: valueAtLevel});
+        this.setState({ breadcrumbs: valueAtLevel });
 
         // For some reason the setState doesn't trigger a render of the component, so force one.
         // Probably has to do with the change happening outside of a change detector cycle.
         this.forceUpdate();
     },
 
-    _onFocus: function(ev) {
+    _onFocus: function (ev) {
         this.focusedElement = ev.target;
     },
 
-    _onBlur: function(ev) {
+    _onBlur: function (ev) {
         this.focusedElement = null;
     },
 
-    _onFilterKeyDown: function(ev) {
+    _onFilterKeyDown: function (ev) {
         if (!this.focusedElement) return;
 
         switch (ev.key) {
@@ -126,7 +126,7 @@ const LeftPanel = createReactClass({
         }
     },
 
-    _onKeyDown: function(ev) {
+    _onKeyDown: function (ev) {
         if (!this.focusedElement) return;
 
         switch (ev.key) {
@@ -139,7 +139,7 @@ const LeftPanel = createReactClass({
         }
     },
 
-    _onMoveFocus: function(ev, up, trap) {
+    _onMoveFocus: function (ev, up, trap) {
         let element = this.focusedElement;
 
         // unclear why this isn't needed
@@ -191,32 +191,32 @@ const LeftPanel = createReactClass({
         }
     },
 
-    onSearch: function(term) {
+    onSearch: function (term) {
         this.setState({ searchFilter: term });
     },
 
-    onSearchCleared: function(source) {
+    onSearchCleared: function (source) {
         if (source === "keyboard") {
-            dis.dispatch({action: 'focus_composer'});
+            dis.dispatch({ action: 'focus_composer' });
         }
-        this.setState({searchExpanded: false});
+        this.setState({ searchExpanded: false });
     },
 
-    collectRoomList: function(ref) {
+    collectRoomList: function (ref) {
         this._roomList = ref;
     },
 
-    _onSearchFocus: function() {
-        this.setState({searchExpanded: true});
+    _onSearchFocus: function () {
+        this.setState({ searchExpanded: true });
     },
 
-    _onSearchBlur: function(event) {
+    _onSearchBlur: function (event) {
         if (event.target.value.length === 0) {
-            this.setState({searchExpanded: false});
+            this.setState({ searchExpanded: false });
         }
     },
 
-    render: function() {
+    render: function () {
         const RoomList = sdk.getComponent('rooms.RoomList');
         const RoomBreadcrumbs = sdk.getComponent('rooms.RoomBreadcrumbs');
         const TagPanel = sdk.getComponent('structures.TagPanel');
@@ -234,7 +234,7 @@ const LeftPanel = createReactClass({
         if (tagPanelEnabled) {
             tagPanelContainer = (<div className="mx_LeftPanel_tagPanelContainer">
                 <TagPanel />
-                { isCustomTagsEnabled ? <CustomRoomTagPanel /> : undefined }
+                {isCustomTagsEnabled ? <CustomRoomTagPanel /> : undefined}
             </div>);
         }
 
@@ -250,8 +250,8 @@ const LeftPanel = createReactClass({
         let exploreButton;
         if (!this.props.collapsed) {
             exploreButton = (
-                <div className={classNames("mx_LeftPanel_explore", {"mx_LeftPanel_explore_hidden": this.state.searchExpanded})}>
-                    <AccessibleButton onClick={() => dis.dispatch({action: 'view_room_directory'})}>{_t("Explore")}</AccessibleButton>
+                <div className={classNames("mx_LeftPanel_explore", { "mx_LeftPanel_explore_hidden": this.state.searchExpanded })}>
+                    <AccessibleButton onClick={() => dis.dispatch({ action: 'view_room_directory' })}>{_t("Explore")}</AccessibleButton>
                 </div>
             );
         }
@@ -259,11 +259,11 @@ const LeftPanel = createReactClass({
         const searchBox = (<SearchBox
             className="mx_LeftPanel_filterRooms"
             enableRoomSearchFocus={true}
-            blurredPlaceholder={ _t('Filter') }
-            placeholder={ _t('Filter rooms…') }
+            blurredPlaceholder={_t('Filter')}
+            placeholder={_t('Filter rooms…')}
             onKeyDown={this._onFilterKeyDown}
-            onSearch={ this.onSearch }
-            onCleared={ this.onSearchCleared }
+            onSearch={this.onSearch}
+            onCleared={this.onSearchCleared}
             onFocus={this._onSearchFocus}
             onBlur={this._onSearchBlur}
             collapsed={this.props.collapsed} />);
@@ -275,24 +275,25 @@ const LeftPanel = createReactClass({
 
         return (
             <div className={containerClasses}>
-                { tagPanelContainer }
+                {tagPanelContainer}
                 <aside className="mx_LeftPanel dark-panel">
-                    <TopLeftMenuButton collapsed={this.props.collapsed} />
-                    { breadcrumbs }
-                    <CallPreview ConferenceHandler={VectorConferenceHandler} />
-                    <div className="mx_LeftPanel_exploreAndFilterRow" onKeyDown={this._onKeyDown} onFocus={this._onFocus} onBlur={this._onBlur}>
-                        { exploreButton }
-                        { searchBox }
-                    </div>
-                    <RoomList
-                        onKeyDown={this._onKeyDown}
-                        onFocus={this._onFocus}
-                        onBlur={this._onBlur}
-                        ref={this.collectRoomList}
-                        resizeNotifier={this.props.resizeNotifier}
-                        collapsed={this.props.collapsed}
-                        searchFilter={this.state.searchFilter}
-                        ConferenceHandler={VectorConferenceHandler} />
+                    <LeftPanelWrapper>
+                        {breadcrumbs}
+                        <CallPreview ConferenceHandler={VectorConferenceHandler} />
+                        <div className="mx_LeftPanel_exploreAndFilterRow" onKeyDown={this._onKeyDown} onFocus={this._onFocus} onBlur={this._onBlur}>
+                            {exploreButton}
+                            {searchBox}
+                        </div>
+                        <RoomList
+                            onKeyDown={this._onKeyDown}
+                            onFocus={this._onFocus}
+                            onBlur={this._onBlur}
+                            ref={this.collectRoomList}
+                            resizeNotifier={this.props.resizeNotifier}
+                            collapsed={this.props.collapsed}
+                            searchFilter={this.state.searchFilter}
+                            ConferenceHandler={VectorConferenceHandler} />
+                    </LeftPanelWrapper>
                 </aside>
             </div>
         );
