@@ -523,7 +523,7 @@ export default createReactClass({
 
         let e2eIcon = null;
         if (this.state.e2eStatus) {
-            e2eIcon = <E2EIcon status={this.state.e2eStatus} className="mx_RoomTile_e2eIcon" />;
+            e2eIcon = <E2EIcon status={this.state.e2eStatus} />;
         }
 
         return <React.Fragment>
@@ -543,10 +543,6 @@ export default createReactClass({
                         role="treeitem"
                     >
                         <div className={avatarClasses}>
-                            <div className="mx_RoomTile_avatar_container">
-                                <RoomAvatar room={this.props.room} width={24} height={24} />
-                                { e2eIcon }
-                            </div>
                         </div>
                         { privateIcon }
                         <div className="mx_RoomTile_nameContainer">

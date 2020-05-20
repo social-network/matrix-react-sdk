@@ -43,6 +43,8 @@ import HomePage from "./HomePage";
 import ResizeNotifier from "../../utils/ResizeNotifier";
 import PlatformPeg from "../../PlatformPeg";
 import LoggedInViewWrapper from "./LoggedInViewWrapper";
+import SocietyPage from './SocietyPage';
+import GlobalPage from './GlobalPage';
 // We need to fetch each pinned message individually (if we don't already have it)
 // so each pinned message may trigger a request. Limit the number per room for sanity.
 // NB. this is just for server notices rather than pinned messages in general.
@@ -627,6 +629,13 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
 
             case PageTypes.MyGroups:
                 pageElement = <MyGroups />;
+                break;
+
+            case PageTypes.SocietyPage:
+                pageElement = <SocietyPage />;
+                break;
+            case PageTypes.GlobalPage:
+                pageElement = <GlobalPage />;
                 break;
 
             case PageTypes.RoomDirectory:

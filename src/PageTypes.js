@@ -23,4 +23,8 @@ export default {
     UserView: "user_view",
     GroupView: "group_view",
     MyGroups: "my_groups",
+    GlobalPage: "global_page",
+    SocietyPage: "society_page",
+
+
 };

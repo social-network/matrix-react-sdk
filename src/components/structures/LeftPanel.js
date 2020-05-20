@@ -280,10 +280,11 @@ const LeftPanel = createReactClass({
                     <LeftPanelWrapper>
                         {breadcrumbs}
                         <CallPreview ConferenceHandler={VectorConferenceHandler} />
+{/*                         {exploreButton}
+
                         <div className="mx_LeftPanel_exploreAndFilterRow" onKeyDown={this._onKeyDown} onFocus={this._onFocus} onBlur={this._onBlur}>
-                            {exploreButton}
                             {searchBox}
-                        </div>
+                        </div> */}
                         <RoomList
                             onKeyDown={this._onKeyDown}
                             onFocus={this._onFocus}
