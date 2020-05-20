@@ -3,11 +3,12 @@ import React from "react";
 import { replaceableComponent } from "../../utils/replaceableComponent";
 
 @replaceableComponent("views.login.SocietyPage")
-
-export default class SocietyPage extends React.Component {
-
+class SocietyPage extends React.Component {
+    static displayName = 'SocietyPage';
     render() {
         return (<div>SocietyPage</div>);
 
     }
 }
+
+export default SocietyPage
