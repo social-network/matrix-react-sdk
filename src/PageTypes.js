@@ -25,6 +25,8 @@ export default {
     MyGroups: "my_groups",
     GlobalPage: "global_page",
     SocietyPage: "society_page",
+    AssetsPage: "assets_page",
+
 
 
 };

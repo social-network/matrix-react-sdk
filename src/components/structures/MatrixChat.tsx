@@ -658,6 +658,9 @@ export default class MatrixChat extends React.PureComponent<IProps, IState> {
             case 'view_global_page':
                 this.viewGlobal();
                 break;
+            case 'view_assets_page':
+                this.viewAssets();
+                break;
             case 'view_set_mxid':
                 this.setMxId(payload);
                 break;
@@ -992,6 +995,18 @@ export default class MatrixChat extends React.PureComponent<IProps, IState> {
         ThemeController.isLogin = false;
         this.themeWatcher.recheck();
     }
+
+    private viewAssets() {
+        // The home page requires the "logged in" view, so we'll set that.
+        this.setStateForNewView({
+            view: Views.LOGGED_IN,
+        });
+        this.setPage(PageTypes.AssetsPage);
+        this.notifyNewScreen('assets');
+        ThemeController.isLogin = false;
+        this.themeWatcher.recheck();
+    }
+
     private viewUser(userId: string, subAction: string) {
         // Wait for the first sync so that `getRoom` gives us a room object if it's
         // in the sync response

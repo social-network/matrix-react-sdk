@@ -45,6 +45,8 @@ import PlatformPeg from "../../PlatformPeg";
 import LoggedInViewWrapper from "./LoggedInViewWrapper";
 import SocietyPage from './SocietyPage';
 import GlobalPage from './GlobalPage';
+import AssetsPage from './AssetsPage';
+
 // We need to fetch each pinned message individually (if we don't already have it)
 // so each pinned message may trigger a request. Limit the number per room for sanity.
 // NB. this is just for server notices rather than pinned messages in general.
@@ -634,6 +636,11 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
             case PageTypes.SocietyPage:
                 pageElement = <SocietyPage />;
                 break;
+
+            case PageTypes.AssetsPage:
+                    pageElement = <AssetsPage />;
+                    break;    
+
             case PageTypes.GlobalPage:
                 pageElement = <GlobalPage />;
                 break;
