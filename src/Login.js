@@ -19,6 +19,7 @@ limitations under the License.
 */
 
 import Matrix from "matrix-js-sdk";
+import dis from './dispatcher';
 
 export default class Login {
     constructor(hsUrl, isUrl, fallbackHsUrl, opts) {
@@ -65,7 +66,7 @@ export default class Login {
     getFlows() {
         const self = this;
         const client = this.createTemporaryClient();
-        return client.loginFlows().then(function(result) {
+        return client.loginFlows().then(function (result) {
             self._flows = result.flows;
             self._currentFlowIndex = 0;
             // technically the UI should display options for all flows for the
@@ -142,6 +143,52 @@ export default class Login {
             throw error;
         });
     }
+
+
+    loginViaJWT(jwtToken) {
+
+
+        if(jwtToken == null) {
+            console.error('onJWTLogin needs to be sent with valid JWT Token');
+            return true;
+        }
+
+        const self = this;
+
+
+
+        const loginParams = {
+            token: jwtToken,
+            initial_device_display_name: this._defaultDeviceDisplayName,
+        };
+
+        const tryFallbackHs = (originalError) => {
+            return sendJWTRequest(
+                self._fallbackHsUrl, this._isUrl, 'm.login.jwt', loginParams,
+            ).catch((fallbackError) => {
+                console.log("fallback HS login failed", fallbackError);
+                // throw the original error
+                throw originalError;
+            });
+        };
+
+        let originalLoginError = null;
+        return sendJWTRequest(
+            self._hsUrl, self._isUrl, 'm.login.jwt', loginParams,
+        ).catch((error) => {
+
+            originalLoginError = error;
+            if (error.httpStatus === 403) {
+                if (self._fallbackHsUrl) {
+                    return tryFallbackHs(originalLoginError);
+                }
+            }
+            throw originalLoginError;
+        }).catch((error) => {
+            console.log("Login failed", error);
+            throw error;
+        });
+    }
 }
 
 
@@ -176,6 +223,73 @@ export async function sendLoginRequest(hsUrl, isUrl, loginType, loginParams) {
             console.log(`Overrode IS setting with ${isUrl} from login response`);
         }
     }
+
+    return {
+        homeserverUrl: hsUrl,
+        identityServerUrl: isUrl,
+        userId: data.user_id,
+        deviceId: data.device_id,
+        accessToken: data.access_token,
+    };
+}
+
+
+/**
+ * Send a login request to the given server, and format the response
+ * as a MatrixClientCreds
+ *
+ * @param {string} hsUrl   the base url of the Homeserver used to log in.
+ * @param {string} isUrl   the base url of the default identity server
+ * @param {string} loginType the type of login to do
+ * @param {object} loginParams the parameters for the login
+ * 
+ * 
+ * @returns {MatrixClientCreds}
+ */
+export async function sendJWTRequest(hsUrl, isUrl, loginType, loginParams) {
+
+
+    const tempClient = Matrix.createClient({ baseUrl: hsUrl });
+
+    console.log(tempClient)
+    let callback = () => console.log('callback login success!')
+    const data = await tempClient.login(
+        loginType,
+        {
+            token: loginParams.token,
+        },
+        callback
+    );
+    const matrixClient = Matrix.createClient({
+        baseUrl: hsUrl,
+        accessToken: data.access_token,
+        userId: data.user_id,
+    });
+    await matrixClient.startClient();
+
+    // const client = Matrix.createClient({
+    //     baseUrl: hsUrl,
+    //     idBaseUrl: isUrl,
+    // });
+
+    console.log(loginType, loginParams, data);
+    // const data = await client.login(loginType, loginParams);
+
+    const wellknown = data.well_known;
+    if (wellknown) {
+        if (wellknown["m.homeserver"] && wellknown["m.homeserver"]["base_url"]) {
+            hsUrl = wellknown["m.homeserver"]["base_url"];
+            console.log(`Overrode homeserver setting with ${hsUrl} from login response`);
+        }
+        if (wellknown["m.identity_server"] && wellknown["m.identity_server"]["base_url"]) {
+            // TODO: should we prompt here?
+            isUrl = wellknown["m.identity_server"]["base_url"];
+            console.log(`Overrode IS setting with ${isUrl} from login response`);
+        }
+    }
+
+
+
 
     return {
         homeserverUrl: hsUrl,

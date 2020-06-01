@@ -19,16 +19,17 @@ limitations under the License.
 import React from 'react';
 import createReactClass from 'create-react-class';
 import PropTypes from 'prop-types';
-import {_t, _td} from '../../../languageHandler';
+import { _t, _td } from '../../../languageHandler';
 import * as sdk from '../../../index';
 import Login from '../../../Login';
 import SdkConfig from '../../../SdkConfig';
 import { messageForResourceLimitError } from '../../../utils/ErrorUtils';
-import AutoDiscoveryUtils, {ValidatedServerConfig} from "../../../utils/AutoDiscoveryUtils";
+import AutoDiscoveryUtils, { ValidatedServerConfig } from "../../../utils/AutoDiscoveryUtils";
 import classNames from "classnames";
 import AuthPage from "../../views/auth/AuthPage";
 import SSOButton from "../../views/elements/SSOButton";
 import PlatformPeg from '../../../PlatformPeg';
+import AccessibleButton from "../../views/elements/AccessibleButton";
 
 // For validating phone numbers without country codes
 const PHONE_NUMBER_REGEX = /^[0-9()\-\s]*$/;
@@ -87,7 +88,7 @@ export default createReactClass({
         isSyncing: PropTypes.bool,
     },
 
-    getInitialState: function() {
+    getInitialState: function () {
         return {
             busy: false,
             busyLoggingIn: null,
@@ -116,7 +117,7 @@ export default createReactClass({
     },
 
     // TODO: [REACT-WARNING] Move this to constructor
-    UNSAFE_componentWillMount: function() {
+    UNSAFE_componentWillMount: function () {
         this._unmounted = false;
 
         // map from login step type to a function which will render a control
@@ -127,12 +128,14 @@ export default createReactClass({
             // CAS and SSO are the same thing, modulo the url we link to
             'm.login.cas': () => this._renderSsoStep("cas"),
             'm.login.sso': () => this._renderSsoStep("sso"),
+            'm.login.jwt': () => this._renderJWTStep("jwt"),
+
         };
 
         this._initLoginLogic();
     },
 
-    componentWillUnmount: function() {
+    componentWillUnmount: function () {
         this._unmounted = true;
     },
 
@@ -145,20 +148,19 @@ export default createReactClass({
         this._initLoginLogic(newProps.serverConfig.hsUrl, newProps.serverConfig.isUrl);
     },
 
-    onPasswordLoginError: function(errorText) {
+    onPasswordLoginError: function (errorText) {
         this.setState({
             errorText,
             loginIncorrect: Boolean(errorText),
         });
     },
 
-    isBusy: function() {
+    isBusy: function () {
         return this.state.busy || this.props.busy;
     },
-
-    onPasswordLogin: async function(username, phoneCountry, phoneNumber, password) {
+    onJWTLogin: async function (jwtToken) {
         if (!this.state.serverIsAlive) {
-            this.setState({busy: true});
+            this.setState({ busy: true });
             // Do a quick liveliness check on the URLs
             let aliveAgain = true;
             try {
@@ -166,7 +168,111 @@ export default createReactClass({
                     this.props.serverConfig.hsUrl,
                     this.props.serverConfig.isUrl,
                 );
-                this.setState({serverIsAlive: true, errorText: ""});
+                this.setState({ serverIsAlive: true, errorText: "" });
+            } catch (e) {
+                const componentState = AutoDiscoveryUtils.authComponentStateForError(e);
+                this.setState({
+                    busy: false,
+                    busyLoggingIn: false,
+                    ...componentState,
+                });
+                aliveAgain = !componentState.serverErrorIsFatal;
+            }
+
+            // Prevent people from submitting their password when something isn't right.
+            if (!aliveAgain) {
+                return;
+            }
+        }
+
+        this.setState({
+            busy: true,
+            busyLoggingIn: true,
+            errorText: null,
+            loginIncorrect: false,
+        });
+
+        this._loginLogic.loginViaJWT(jwtToken).then((data) => {
+            this.setState({ serverIsAlive: true }); // it must be, we logged in.
+            this.props.onLoggedIn(data);
+        }, (error) => {
+            if (this._unmounted) {
+                return;
+            }
+            let errorText;
+
+            // Some error strings only apply for logging in
+            if (error.errcode === 'M_RESOURCE_LIMIT_EXCEEDED') {
+                const errorTop = messageForResourceLimitError(
+                    error.data.limit_type,
+                    error.data.admin_contact, {
+                    'monthly_active_user': _td(
+                        "This homeserver has hit its Monthly Active User limit.",
+                    ),
+                    '': _td(
+                        "This homeserver has exceeded one of its resource limits.",
+                    ),
+                });
+                const errorDetail = messageForResourceLimitError(
+                    error.data.limit_type,
+                    error.data.admin_contact, {
+                    '': _td(
+                        "Please <a>contact your service administrator</a> to continue using this service.",
+                    ),
+                });
+                errorText = (
+                    <div>
+                        <div>{errorTop}</div>
+                        <div className="mx_Login_smallError">{errorDetail}</div>
+                    </div>
+                );
+            } else if (error.httpStatus === 401 || error.httpStatus === 403) {
+                if (error.errcode === 'M_USER_DEACTIVATED') {
+                    errorText = _t('This account has been deactivated.');
+                } else if (SdkConfig.get()['disable_custom_urls']) {
+                    errorText = (
+                        <div>
+                            <div>{_t('Incorrect username and/or password.')}</div>
+                            <div className="mx_Login_smallError">
+                                {_t(
+                                    'Please note you are logging into the %(hs)s server, not matrix.org.',
+                                    { hs: this.props.serverConfig.hsName },
+                                )}
+                            </div>
+                        </div>
+                    );
+                } else {
+                    errorText = _t('Incorrect username and/or password.');
+                }
+            } else {
+                // other errors, not specific to doing a password login
+                errorText = this._errorTextFromError(error);
+            }
+
+            this.setState({
+                busy: false,
+                busyLoggingIn: false,
+                errorText: errorText,
+                // 401 would be the sensible status code for 'incorrect password'
+                // but the login API gives a 403 https://matrix.org/jira/browse/SYN-744
+                // mentions this (although the bug is for UI auth which is not this)
+                // We treat both as an incorrect password
+                loginIncorrect: error.httpStatus === 401 || error.httpStatus === 403,
+            });
+        });
+    },
+
+    onPasswordLogin: async function (username, phoneCountry, phoneNumber, password) {
+        if (!this.state.serverIsAlive) {
+            this.setState({ busy: true });
+            // Do a quick liveliness check on the URLs
+            let aliveAgain = true;
+            try {
+                await AutoDiscoveryUtils.validateServerConfigWithStaticUrls(
+                    this.props.serverConfig.hsUrl,
+                    this.props.serverConfig.isUrl,
+                );
+                this.setState({ serverIsAlive: true, errorText: "" });
             } catch (e) {
                 const componentState = AutoDiscoveryUtils.authComponentStateForError(e);
                 this.setState({
@@ -193,7 +299,7 @@ export default createReactClass({
         this._loginLogic.loginViaPassword(
             username, phoneCountry, phoneNumber, password,
         ).then((data) => {
-            this.setState({serverIsAlive: true}); // it must be, we logged in.
+            this.setState({ serverIsAlive: true }); // it must be, we logged in.
             this.props.onLoggedIn(data, password);
         }, (error) => {
             if (this._unmounted) {
@@ -235,11 +341,11 @@ export default createReactClass({
                 } else if (SdkConfig.get()['disable_custom_urls']) {
                     errorText = (
                         <div>
-                            <div>{ _t('Incorrect username and/or password.') }</div>
+                            <div>{_t('Incorrect username and/or password.')}</div>
                             <div className="mx_Login_smallError">
                                 {_t(
                                     'Please note you are logging into the %(hs)s server, not matrix.org.',
-                                    {hs: this.props.serverConfig.hsName},
+                                    { hs: this.props.serverConfig.hsName },
                                 )}
                             </div>
                         </div>
@@ -265,11 +371,11 @@ export default createReactClass({
         });
     },
 
-    onUsernameChanged: function(username) {
+    onUsernameChanged: function (username) {
         this.setState({ username: username });
     },
 
-    onUsernameBlur: async function(username) {
+    onUsernameBlur: async function (username) {
         const doWellknownLookup = username[0] === "@";
         this.setState({
             username: username,
@@ -316,17 +422,17 @@ export default createReactClass({
         }
     },
 
-    onPhoneCountryChanged: function(phoneCountry) {
+    onPhoneCountryChanged: function (phoneCountry) {
         this.setState({ phoneCountry: phoneCountry });
     },
 
-    onPhoneNumberChanged: function(phoneNumber) {
+    onPhoneNumberChanged: function (phoneNumber) {
         this.setState({
             phoneNumber: phoneNumber,
         });
     },
 
-    onPhoneNumberBlur: function(phoneNumber) {
+    onPhoneNumberBlur: function (phoneNumber) {
         // Validate the phone number entered
         if (!PHONE_NUMBER_REGEX.test(phoneNumber)) {
             this.setState({
@@ -341,13 +447,13 @@ export default createReactClass({
         }
     },
 
-    onRegisterClick: function(ev) {
+    onRegisterClick: function (ev) {
         ev.preventDefault();
         ev.stopPropagation();
         this.props.onRegisterClick();
     },
 
-    onTryRegisterClick: function(ev) {
+    onTryRegisterClick: function (ev) {
         const step = this._getCurrentFlowStep();
         if (step === 'm.login.sso' || step === 'm.login.cas') {
             // If we're showing SSO it means that registration is also probably disabled,
@@ -377,7 +483,7 @@ export default createReactClass({
         });
     },
 
-    _initLoginLogic: async function(hsUrl, isUrl) {
+    _initLoginLogic: async function (hsUrl, isUrl) {
         hsUrl = hsUrl || this.props.serverConfig.hsUrl;
         isUrl = isUrl || this.props.serverConfig.isUrl;
 
@@ -431,8 +537,9 @@ export default createReactClass({
         }
 
         loginLogic.getFlows().then((flows) => {
+            console.log('flows', flows);
             // look for a flow where we understand all of the steps.
-            for (let i = 0; i < flows.length; i++ ) {
+            for (let i = 0; i < flows.length; i++) {
                 if (!this._isSupportedFlow(flows[i])) {
                     continue;
                 }
@@ -450,8 +557,7 @@ export default createReactClass({
             // flow.
             this.setState({
                 errorText: _t(
-                    "This homeserver doesn't offer any login flows which are " +
-                        "supported by this client.",
+                    "This ergo.",
                 ),
             });
         }, (err) => {
@@ -467,7 +573,7 @@ export default createReactClass({
         });
     },
 
-    _isSupportedFlow: function(flow) {
+    _isSupportedFlow: function (flow) {
         // technically the flow can have multiple steps, but no one does this
         // for login and loginLogic doesn't support it so we can ignore it.
         if (!this._stepRendererMap[flow.type]) {
@@ -477,7 +583,7 @@ export default createReactClass({
         return true;
     },
 
-    _getCurrentFlowStep: function() {
+    _getCurrentFlowStep: function () {
         return this._loginLogic ? this._loginLogic.getCurrentFlowStep() : null;
     },
 
@@ -488,39 +594,39 @@ export default createReactClass({
         }
 
         let errorText = _t("Error: Problem communicating with the given homeserver.") +
-                (errCode ? " (" + errCode + ")" : "");
+            (errCode ? " (" + errCode + ")" : "");
 
         if (err.cors === 'rejected') {
             if (window.location.protocol === 'https:' &&
                 (this.props.serverConfig.hsUrl.startsWith("http:") ||
-                 !this.props.serverConfig.hsUrl.startsWith("http"))
+                    !this.props.serverConfig.hsUrl.startsWith("http"))
             ) {
                 errorText = <span>
-                    { _t("Can't connect to homeserver via HTTP when an HTTPS URL is in your browser bar. " +
+                    {_t("Can't connect to homeserver via HTTP when an HTTPS URL is in your browser bar. " +
                         "Either use HTTPS or <a>enable unsafe scripts</a>.", {},
                         {
                             'a': (sub) => {
                                 return <a target="_blank" rel="noreferrer noopener"
                                     href="https://www.google.com/search?&q=enable%20unsafe%20scripts"
                                 >
-                                    { sub }
+                                    {sub}
                                 </a>;
                             },
                         },
-                    ) }
+                    )}
                 </span>;
             } else {
                 errorText = <span>
-                    { _t("Can't connect to homeserver - please check your connectivity, ensure your " +
+                    {_t("Can't connect to homeserver - please check your connectivity, ensure your " +
                         "<a>homeserver's SSL certificate</a> is trusted, and that a browser extension " +
                         "is not blocking requests.", {},
                         {
                             'a': (sub) =>
                                 <a target="_blank" rel="noreferrer noopener" href={this.props.serverConfig.hsUrl}>
-                                    { sub }
+                                    {sub}
                                 </a>,
                         },
-                    ) }
+                    )}
                 </span>;
             }
         }
@@ -574,7 +680,7 @@ export default createReactClass({
         return null;
     },
 
-    _renderPasswordStep: function() {
+    _renderPasswordStep: function () {
         const PasswordLogin = sdk.getComponent('auth.PasswordLogin');
 
         let onEditServerDetailsClick = null;
@@ -585,27 +691,27 @@ export default createReactClass({
 
         return (
             <PasswordLogin
-               onSubmit={this.onPasswordLogin}
-               onError={this.onPasswordLoginError}
-               onEditServerDetailsClick={onEditServerDetailsClick}
-               initialUsername={this.state.username}
-               initialPhoneCountry={this.state.phoneCountry}
-               initialPhoneNumber={this.state.phoneNumber}
-               onUsernameChanged={this.onUsernameChanged}
-               onUsernameBlur={this.onUsernameBlur}
-               onPhoneCountryChanged={this.onPhoneCountryChanged}
-               onPhoneNumberChanged={this.onPhoneNumberChanged}
-               onPhoneNumberBlur={this.onPhoneNumberBlur}
-               onForgotPasswordClick={this.props.onForgotPasswordClick}
-               loginIncorrect={this.state.loginIncorrect}
-               serverConfig={this.props.serverConfig}
-               disableSubmit={this.isBusy()}
-               busy={this.props.isSyncing || this.state.busyLoggingIn}
+                onSubmit={this.onPasswordLogin}
+                onError={this.onPasswordLoginError}
+                onEditServerDetailsClick={onEditServerDetailsClick}
+                initialUsername={this.state.username}
+                initialPhoneCountry={this.state.phoneCountry}
+                initialPhoneNumber={this.state.phoneNumber}
+                onUsernameChanged={this.onUsernameChanged}
+                onUsernameBlur={this.onUsernameBlur}
+                onPhoneCountryChanged={this.onPhoneCountryChanged}
+                onPhoneNumberChanged={this.onPhoneNumberChanged}
+                onPhoneNumberBlur={this.onPhoneNumberBlur}
+                onForgotPasswordClick={this.props.onForgotPasswordClick}
+                loginIncorrect={this.state.loginIncorrect}
+                serverConfig={this.props.serverConfig}
+                disableSubmit={this.isBusy()}
+                busy={this.props.isSyncing || this.state.busyLoggingIn}
             />
         );
     },
 
-    _renderSsoStep: function(loginType) {
+    _renderSsoStep: function (loginType) {
         const SignInToText = sdk.getComponent('views.auth.SignInToText');
 
         let onEditServerDetailsClick = null;
@@ -636,7 +742,34 @@ export default createReactClass({
         );
     },
 
-    render: function() {
+    _renderJWTStep: function (loginType) {
+        const JWTLogin = sdk.getComponent('views.auth.JWTLogin');
+
+        let onEditServerDetailsClick = null;
+        // If custom URLs are allowed, wire up the server details edit link.
+        if (PHASES_ENABLED && !SdkConfig.get()['disable_custom_urls']) {
+            onEditServerDetailsClick = this.onEditServerDetailsClick;
+        }
+        // XXX: This link does *not* have a target="_blank" because single sign-on relies on
+        // redirecting the user back to a URI once they're logged in. On the web, this means
+        // we use the same window and redirect back to riot. On electron, this actually
+        // opens the SSO page in the electron app itself due to
+        // https://github.com/electron/electron/issues/8841 and so happens to work.
+        // If this bug gets fixed, it will break SSO since it will open the SSO page in the
+        // user's browser, let them log into their SSO provider, then redirect their browser
+        // to vector://vector which, of course, will not work.
+        return (
+            <JWTLogin
+                serverConfig={this.props.serverConfig}
+                onEditServerDetailsClick={this.onEditServerDetailsClick}
+                onJWTLogin={this.onJWTLogin}
+                isSyncing={this.props.isSyncing}
+                busyLoggingIn={this.state.busyLoggingIn}
+            ></JWTLogin>
+        );
+    },
+
+    render: function () {
         const Loader = sdk.getComponent("elements.Spinner");
         const InlineSpinner = sdk.getComponent("elements.InlineSpinner");
         const AuthHeader = sdk.getComponent("auth.AuthHeader");
@@ -650,7 +783,7 @@ export default createReactClass({
         if (errorText) {
             errorTextSection = (
                 <div className="mx_Login_error">
-                    { errorText }
+                    {errorText}
                 </div>
             );
         }
@@ -674,16 +807,16 @@ export default createReactClass({
             footer = <div className="mx_AuthBody_paddedFooter">
                 <div className="mx_AuthBody_paddedFooter_title">
                     <InlineSpinner w={20} h={20} />
-                    { this.props.isSyncing ? _t("Syncing...") : _t("Signing In...") }
+                    {this.props.isSyncing ? _t("Syncing...") : _t("Signing In...")}
                 </div>
-                { this.props.isSyncing && <div className="mx_AuthBody_paddedFooter_subtitle">
+                {this.props.isSyncing && <div className="mx_AuthBody_paddedFooter_subtitle">
                     {_t("If you've joined lots of rooms, this might take a while")}
-                </div> }
+                </div>}
             </div>;
         } else {
             footer = (
                 <a className="mx_AuthBody_changeFlow" onClick={this.onTryRegisterClick} href="#">
-                    { _t('Create account') }
+                    {_t('Create account')}
                 </a>
             );
         }
@@ -696,11 +829,11 @@ export default createReactClass({
                         {_t('Sign in')}
                         {loader}
                     </h2>
-                    { errorTextSection }
-                    { serverDeadSection }
-                    { this.renderServerComponent() }
-                    { this.renderLoginComponentForStep() }
-                    { footer }
+                    {errorTextSection}
+                    {serverDeadSection}
+                    {this.renderServerComponent()}
+                    {this.renderLoginComponentForStep()}
+                    {footer}
                 </AuthBody>
             </AuthPage>
         );
